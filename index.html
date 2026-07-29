@@ -32,12 +32,16 @@
         <strong id="workHours">0</strong>
       </article>
       <article class="summary-card">
-        <span>Túlóra</span>
+        <span>Túlórás nap</span>
         <strong id="overtimeDays">0</strong>
       </article>
       <article class="summary-card">
-        <span>Szabadnap</span>
-        <strong id="offDays">0</strong>
+        <span>Túlóra</span>
+        <strong id="overtimeHours">0 óra</strong>
+      </article>
+      <article class="summary-card payday-summary">
+        <span>Fizetésnap · 3. munkanap</span>
+        <strong id="paydayDate">–</strong>
       </article>
     </section>
 
@@ -61,7 +65,8 @@
       <div><i class="dot morning"></i>Délelőtt 06–14</div>
       <div><i class="dot afternoon"></i>Délután 14–22</div>
       <div><i class="dot night"></i>Éjszaka 22–06</div>
-      <div><i class="dot overtime"></i>Túlóra</div>
+      <div><i class="dot overtime"></i>12 órás túlóra</div>
+      <div><i class="dot payday"></i>Fizetésnap</div>
       <div><i class="dot vacation"></i>Szabadság</div>
       <div><i class="dot sick"></i>Táppénz</div>
     </section>
@@ -85,6 +90,7 @@
         <button id="fillRotation" class="primary-btn">3 műszakos rend kitöltése</button>
         <button id="clearMonth" class="danger-btn">Hónap törlése</button>
       </div>
+      <p class="payday-note">A fizetésnap a hónap 3. munkanapja. A 2026-os magyar ünnepnapokat és áthelyezett munkanapokat is figyelembe veszi.</p>
     </section>
   </main>
 
@@ -98,19 +104,43 @@
         <button value="cancel" class="close-btn" aria-label="Bezárás">×</button>
       </div>
 
+      <p class="option-heading">Normál műszak</p>
       <div class="shift-options">
         <button type="button" data-shift="morning" class="shift-option morning-bg">
-          <strong>Délelőtt</strong><span>06:00–14:00</span>
+          <strong>Délelőtt</strong><span>06:00–14:00 · 8 óra</span>
         </button>
         <button type="button" data-shift="afternoon" class="shift-option afternoon-bg">
-          <strong>Délután</strong><span>14:00–22:00</span>
+          <strong>Délután</strong><span>14:00–22:00 · 8 óra</span>
         </button>
         <button type="button" data-shift="night" class="shift-option night-bg">
-          <strong>Éjszaka</strong><span>22:00–06:00</span>
+          <strong>Éjszaka</strong><span>22:00–06:00 · 8 óra</span>
         </button>
-        <button type="button" data-shift="overtime" class="shift-option overtime-bg">
-          <strong>Túlóra</strong><span>Plusz munkanap</span>
+      </div>
+
+      <p class="option-heading">12 órás túlóra</p>
+      <div class="shift-options overtime-options">
+        <button type="button" data-shift="morning_ot_02_14" class="shift-option overtime-morning-bg">
+          <strong>Délelőtt túlóra</strong><span>02:00–14:00 · 12 óra</span>
         </button>
+        <button type="button" data-shift="morning_ot_06_18" class="shift-option overtime-morning-bg">
+          <strong>Délelőtt túlóra</strong><span>06:00–18:00 · 12 óra</span>
+        </button>
+        <button type="button" data-shift="afternoon_ot_10_22" class="shift-option overtime-afternoon-bg">
+          <strong>Délután túlóra</strong><span>10:00–22:00 · 12 óra</span>
+        </button>
+        <button type="button" data-shift="afternoon_ot_14_02" class="shift-option overtime-afternoon-bg">
+          <strong>Délután túlóra</strong><span>14:00–02:00 · 12 óra</span>
+        </button>
+        <button type="button" data-shift="night_ot_18_06" class="shift-option overtime-night-bg">
+          <strong>Éjszaka túlóra</strong><span>18:00–06:00 · 12 óra</span>
+        </button>
+        <button type="button" data-shift="night_ot_22_10" class="shift-option overtime-night-bg">
+          <strong>Éjszaka túlóra</strong><span>22:00–10:00 · 12 óra</span>
+        </button>
+      </div>
+
+      <p class="option-heading">Távollét és egyéb</p>
+      <div class="shift-options">
         <button type="button" data-shift="vacation" class="shift-option vacation-bg">
           <strong>Szabadság</strong><span>Fizetett távollét</span>
         </button>
