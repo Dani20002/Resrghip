@@ -1,4 +1,4 @@
-const CACHE = 'rsrg-calendar-v2';
+const CACHE = 'rsrg-calendar-v3-settings';
 const ASSETS = ['./', './index.html', './style.css', './app.js', './manifest.webmanifest', './icon.svg'];
 
 self.addEventListener('install', event => {
@@ -14,7 +14,7 @@ self.addEventListener('activate', event => {
 });
 
 self.addEventListener('fetch', event => {
-  if (event.request.method !== 'GET') return;
+  if (event.request.method !== 'GET' || event.request.url.startsWith('blob:') || event.request.url.startsWith('data:')) return;
 
   event.respondWith(
     fetch(event.request)
