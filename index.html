@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#111827" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="RSRG Naptár" />
+  <title>RSRG Műszaknaptár</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="app-shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">MUNKAHELYI NAPTÁR</p>
+        <h1>RSRG Műszaknaptár</h1>
+      </div>
+      <button id="todayBtn" class="ghost-btn">Ma</button>
+    </header>
+
+    <section class="summary-grid" aria-label="Havi összesítő">
+      <article class="summary-card">
+        <span>Munkanap</span>
+        <strong id="workDays">0</strong>
+      </article>
+      <article class="summary-card">
+        <span>Munkaóra</span>
+        <strong id="workHours">0</strong>
+      </article>
+      <article class="summary-card">
+        <span>Túlóra</span>
+        <strong id="overtimeDays">0</strong>
+      </article>
+      <article class="summary-card">
+        <span>Szabadnap</span>
+        <strong id="offDays">0</strong>
+      </article>
+    </section>
+
+    <section class="calendar-card">
+      <div class="calendar-toolbar">
+        <button id="prevMonth" class="icon-btn" aria-label="Előző hónap">‹</button>
+        <div class="month-title-wrap">
+          <h2 id="monthTitle"></h2>
+          <p id="weekInfo">Érints meg egy napot a beállításhoz</p>
+        </div>
+        <button id="nextMonth" class="icon-btn" aria-label="Következő hónap">›</button>
+      </div>
+
+      <div class="weekdays" aria-hidden="true">
+        <span>H</span><span>K</span><span>Sze</span><span>Cs</span><span>P</span><span>Szo</span><span>V</span>
+      </div>
+      <div id="calendar" class="calendar-grid" role="grid"></div>
+    </section>
+
+    <section class="legend-card">
+      <div><i class="dot morning"></i>Délelőtt 06–14</div>
+      <div><i class="dot afternoon"></i>Délután 14–22</div>
+      <div><i class="dot night"></i>Éjszaka 22–06</div>
+      <div><i class="dot overtime"></i>Túlóra</div>
+      <div><i class="dot vacation"></i>Szabadság</div>
+      <div><i class="dot sick"></i>Táppénz</div>
+    </section>
+
+    <section class="actions-card">
+      <h3>Gyors kitöltés</h3>
+      <p>Állítsd be a háromhetes váltást a megadott héttől.</p>
+      <label class="field">
+        <span>Kezdő hét műszakja</span>
+        <select id="rotationStartShift">
+          <option value="morning">Délelőtt</option>
+          <option value="afternoon">Délután</option>
+          <option value="night">Éjszaka</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>Kezdő dátum</span>
+        <input id="rotationStartDate" type="date" />
+      </label>
+      <div class="button-row">
+        <button id="fillRotation" class="primary-btn">3 műszakos rend kitöltése</button>
+        <button id="clearMonth" class="danger-btn">Hónap törlése</button>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="shiftDialog" class="shift-dialog">
+    <form method="dialog">
+      <div class="dialog-head">
+        <div>
+          <p class="eyebrow">NAP BEÁLLÍTÁSA</p>
+          <h3 id="selectedDateTitle"></h3>
+        </div>
+        <button value="cancel" class="close-btn" aria-label="Bezárás">×</button>
+      </div>
+
+      <div class="shift-options">
+        <button type="button" data-shift="morning" class="shift-option morning-bg">
+          <strong>Délelőtt</strong><span>06:00–14:00</span>
+        </button>
+        <button type="button" data-shift="afternoon" class="shift-option afternoon-bg">
+          <strong>Délután</strong><span>14:00–22:00</span>
+        </button>
+        <button type="button" data-shift="night" class="shift-option night-bg">
+          <strong>Éjszaka</strong><span>22:00–06:00</span>
+        </button>
+        <button type="button" data-shift="overtime" class="shift-option overtime-bg">
+          <strong>Túlóra</strong><span>Plusz munkanap</span>
+        </button>
+        <button type="button" data-shift="vacation" class="shift-option vacation-bg">
+          <strong>Szabadság</strong><span>Fizetett távollét</span>
+        </button>
+        <button type="button" data-shift="sick" class="shift-option sick-bg">
+          <strong>Táppénz</strong><span>Betegállomány</span>
+        </button>
+        <button type="button" data-shift="off" class="shift-option off-bg">
+          <strong>Szabadnap</strong><span>Nincs műszak</span>
+        </button>
+        <button type="button" data-shift="clear" class="shift-option clear-bg">
+          <strong>Törlés</strong><span>Nap alaphelyzetbe</span>
+        </button>
+      </div>
+
+      <label class="field note-field">
+        <span>Megjegyzés</span>
+        <textarea id="dayNote" rows="3" placeholder="Pl. SFT, EOL, kábelezés…"></textarea>
+      </label>
+      <button type="button" id="saveNote" class="primary-btn full-width">Megjegyzés mentése</button>
+    </form>
+  </dialog>
+
+  <script src="app.js"></script>
+</body>
+</html>
