@@ -7,13 +7,19 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="RSRG Naptár" id="appleAppTitle" />
+  <meta name="description" content="RSRG műszaknaptár, fizetéskalkulátor és munkaidő-követő." />
   <title>RSRG Műszaknaptár</title>
   <link id="manifestLink" rel="manifest" href="manifest.webmanifest" />
   <link id="favicon" rel="icon" href="icon.svg" type="image/svg+xml" />
-  <link id="appleTouchIcon" rel="apple-touch-icon" href="icon.svg" />
-  <link rel="stylesheet" href="style.css" />
+  <link id="appleTouchIcon" rel="apple-touch-icon" href="icon-192.png" />
+  <link rel="stylesheet" href="style.css?v=4.0.0" />
 </head>
 <body>
+  <div id="updateBanner" class="update-banner" hidden>
+    <span>Új verzió érhető el.</span>
+    <button id="reloadAppBtn" type="button">Frissítés</button>
+  </div>
+
   <main class="app-shell">
     <header class="topbar">
       <div class="brand-copy">
@@ -21,293 +27,380 @@
         <h1 id="headerTitle">RSRG Műszaknaptár</h1>
       </div>
       <div class="topbar-actions">
-        <button id="todayBtn" class="ghost-btn">Ma</button>
-        <button id="settingsShortcut" class="icon-btn settings-shortcut" aria-label="Beállítások">⚙</button>
+        <button id="todayBtn" class="ghost-btn" type="button">Ma</button>
+        <button id="settingsShortcut" class="icon-btn" type="button" aria-label="Beállítások">⚙</button>
       </div>
     </header>
 
     <nav class="tab-bar" aria-label="Alkalmazás fülei">
-      <button class="tab-btn active" data-tab="calendarTab" aria-selected="true">Naptár</button>
-      <button class="tab-btn" data-tab="settingsTab" aria-selected="false">Beállítások</button>
+      <button class="tab-btn active" data-tab="homeTab" aria-selected="true"><span>⌂</span>Kezdőlap</button>
+      <button class="tab-btn" data-tab="calendarTab" aria-selected="false"><span>▦</span>Naptár</button>
+      <button class="tab-btn" data-tab="salaryTab" aria-selected="false"><span>Ft</span>Fizetés</button>
+      <button class="tab-btn" data-tab="statsTab" aria-selected="false"><span>▥</span>Statisztika</button>
+      <button class="tab-btn" data-tab="settingsTab" aria-selected="false"><span>⚙</span>Beállítások</button>
     </nav>
 
-    <section id="calendarTab" class="tab-panel active">
+    <section id="homeTab" class="tab-panel active">
+      <section class="hero-grid">
+        <article class="next-shift-card">
+          <div class="card-kicker">KÖVETKEZŐ MŰSZAK</div>
+          <h2 id="nextShiftName">Nincs beállított műszak</h2>
+          <p id="nextShiftTime">Adj hozzá műszakokat a naptárban.</p>
+          <div id="nextShiftCountdown" class="countdown">—</div>
+          <button id="openNextShiftDay" class="secondary-btn compact" type="button" hidden>Nap megnyitása</button>
+        </article>
+
+        <article class="today-card">
+          <div class="today-row">
+            <div>
+              <span>Ma</span>
+              <strong id="todayShift">—</strong>
+            </div>
+            <div>
+              <span>Holnap</span>
+              <strong id="tomorrowShift">—</strong>
+            </div>
+          </div>
+          <div class="today-row lower">
+            <div>
+              <span>Következő fizu</span>
+              <strong id="homePayday">—</strong>
+            </div>
+            <div>
+              <span>Szabi maradt</span>
+              <strong id="homeVacationLeft">—</strong>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <section class="summary-grid home-summary" aria-label="Aktuális havi összesítő">
+        <article class="summary-card"><span>Munkaóra</span><strong id="homeWorkHours">0</strong></article>
+        <article class="summary-card"><span>Túlóra</span><strong id="homeOvertimeHours">0 óra</strong></article>
+        <article class="summary-card"><span>Várható nettó</span><strong id="homeNetSalary">0 Ft</strong></article>
+        <article class="summary-card"><span>Eddig megkeresve</span><strong id="homeEarnedSoFar">0 Ft</strong></article>
+      </section>
+
+      <section class="panel-card">
+        <div class="section-heading compact-heading">
+          <div>
+            <p class="eyebrow">KÖVETKEZŐ NAPOK</p>
+            <h2>Programok és műszakok</h2>
+          </div>
+          <button id="openCalendarFromHome" class="text-btn" type="button">Naptár</button>
+        </div>
+        <div id="upcomingList" class="upcoming-list"></div>
+      </section>
+
+      <section class="panel-card quick-actions-card">
+        <div class="section-heading compact-heading">
+          <div>
+            <p class="eyebrow">GYORS MŰVELETEK</p>
+            <h2>Egy érintéssel</h2>
+          </div>
+        </div>
+        <div class="quick-action-grid">
+          <button id="quickTodayEdit" class="quick-action" type="button"><span>✎</span><strong>Mai nap</strong><small>Műszak vagy esemény</small></button>
+          <button id="quickRotation" class="quick-action" type="button"><span>↻</span><strong>Váltás kitöltése</strong><small>3 műszakos rend</small></button>
+          <button id="quickSalary" class="quick-action" type="button"><span>Ft</span><strong>Fizetés</strong><small>Bruttó és nettó</small></button>
+          <button id="quickExportIcs" class="quick-action" type="button"><span>⇩</span><strong>iPhone naptár</strong><small>Havi export</small></button>
+        </div>
+      </section>
+    </section>
+
+    <section id="calendarTab" class="tab-panel" hidden>
       <section class="summary-grid" aria-label="Havi összesítő">
-        <article class="summary-card">
-          <span>Munkanap</span>
-          <strong id="workDays">0</strong>
-        </article>
-        <article class="summary-card">
-          <span>Munkaóra</span>
-          <strong id="workHours">0</strong>
-        </article>
-        <article class="summary-card">
-          <span>Túlórás nap</span>
-          <strong id="overtimeDays">0</strong>
-        </article>
-        <article class="summary-card">
-          <span>Túlóra</span>
-          <strong id="overtimeHours">0 óra</strong>
-        </article>
-        <article class="summary-card">
-          <span>Fizetett távollét</span>
-          <strong id="paidLeaveDays">0 nap</strong>
-        </article>
-        <article class="summary-card payday-summary">
-          <span>Fizetésnap · 3. munkanap</span>
-          <strong id="paydayDate">–</strong>
-        </article>
+        <article class="summary-card"><span>Munkanap</span><strong id="workDays">0</strong></article>
+        <article class="summary-card"><span>Munkaóra</span><strong id="workHours">0</strong></article>
+        <article class="summary-card"><span>Túlórás nap</span><strong id="overtimeDays">0</strong></article>
+        <article class="summary-card"><span>Túlóra</span><strong id="overtimeHours">0 óra</strong></article>
+        <article class="summary-card"><span>Fizetett távollét</span><strong id="paidLeaveDays">0 nap</strong></article>
+        <article class="summary-card payday-summary"><span>Fizetésnap</span><strong id="paydayDate">—</strong></article>
       </section>
 
       <section class="calendar-card">
         <div class="calendar-toolbar">
-          <button id="prevMonth" class="icon-btn" aria-label="Előző hónap">‹</button>
+          <button id="prevMonth" class="icon-btn" type="button" aria-label="Előző hónap">‹</button>
           <div class="month-title-wrap">
             <h2 id="monthTitle"></h2>
-            <p id="weekInfo">Érints meg egy napot a beállításhoz</p>
+            <p id="weekInfo">Érints meg egy napot a szerkesztéshez</p>
           </div>
-          <button id="nextMonth" class="icon-btn" aria-label="Következő hónap">›</button>
+          <button id="nextMonth" class="icon-btn" type="button" aria-label="Következő hónap">›</button>
         </div>
-
         <div class="weekdays" aria-hidden="true">
           <span>H</span><span>K</span><span>Sze</span><span>Cs</span><span>P</span><span>Szo</span><span>V</span>
         </div>
         <div id="calendar" class="calendar-grid" role="grid"></div>
       </section>
 
-      <section class="legend-card">
-        <div><i class="dot morning"></i>Délelőtt 06–14</div>
-        <div><i class="dot afternoon"></i>Délután 14–22</div>
-        <div><i class="dot night"></i>Éjszaka 22–06</div>
-        <div><i class="dot overtime"></i>12 órás túlóra</div>
-        <div><i class="dot payday"></i>Fizetésnap</div>
-        <div><i class="dot vacation"></i>Fizetett távollét</div>
-        <div><i class="dot sick"></i>Táppénz</div>
+      <section class="legend-card" id="legendCard"></section>
+
+      <section class="panel-card">
+        <div class="section-heading compact-heading">
+          <div><p class="eyebrow">GYORS KITÖLTÉS</p><h2>Háromhetes műszakváltás</h2></div>
+        </div>
+        <div class="settings-grid three-col">
+          <label class="field"><span>Kezdő hét műszakja</span><select id="rotationStartShift"><option value="morning">Délelőtt</option><option value="afternoon">Délután</option><option value="night">Éjszaka</option></select></label>
+          <label class="field"><span>Kezdő dátum</span><input id="rotationStartDate" type="date" /></label>
+          <label class="field"><span>Kitöltött hetek</span><select id="rotationWeeks"><option value="6">6 hét</option><option value="12" selected>12 hét</option><option value="26">26 hét</option><option value="52">52 hét</option></select></label>
+        </div>
+        <label class="check-row"><input id="rotationOverwrite" type="checkbox" /><span>A már kitöltött napokat is írja felül</span></label>
+        <div class="button-row">
+          <button id="fillRotation" class="primary-btn" type="button">Műszakrend kitöltése</button>
+          <button id="clearMonth" class="danger-btn" type="button">Hónap törlése</button>
+        </div>
       </section>
 
-      <section class="actions-card">
-        <h3>Gyors kitöltés</h3>
-        <p>Állítsd be a háromhetes váltást a megadott héttől.</p>
-        <label class="field">
-          <span>Kezdő hét műszakja</span>
-          <select id="rotationStartShift">
-            <option value="morning">Délelőtt</option>
-            <option value="afternoon">Délután</option>
-            <option value="night">Éjszaka</option>
-          </select>
-        </label>
-        <label class="field">
-          <span>Kezdő dátum</span>
-          <input id="rotationStartDate" type="date" />
-        </label>
-        <div class="button-row">
-          <button id="fillRotation" class="primary-btn">3 műszakos rend kitöltése</button>
-          <button id="clearMonth" class="danger-btn">Hónap törlése</button>
+      <section class="panel-card">
+        <div class="section-heading compact-heading"><div><p class="eyebrow">MŰSZAKCSERE</p><h2>Két nap felcserélése</h2></div></div>
+        <div class="settings-grid two-col">
+          <label class="field"><span>Első nap</span><input id="swapDateA" type="date" /></label>
+          <label class="field"><span>Második nap</span><input id="swapDateB" type="date" /></label>
         </div>
-        <p class="payday-note">A fizetésnap a hónap 3. munkanapja. A 2026-os magyar ünnepnapokat és áthelyezett munkanapokat is figyelembe veszi.</p>
+        <button id="swapDaysBtn" class="secondary-btn" type="button">Napok felcserélése</button>
+      </section>
+
+      <section class="panel-card">
+        <div class="section-heading compact-heading"><div><p class="eyebrow">EXPORT</p><h2>Naptár és lista</h2></div></div>
+        <div class="button-row wrap">
+          <button id="exportMonthIcs" class="secondary-btn" type="button">Hónap exportálása iPhone naptárba</button>
+          <button id="exportYearIcs" class="secondary-btn" type="button">Teljes év exportálása</button>
+          <button id="exportMonthCsv" class="secondary-btn" type="button">Havi CSV</button>
+        </div>
+        <p class="settings-hint">Az iPhone naptárba exportált események saját riasztást is tartalmazhatnak, ezért megbízhatóbban jeleznek akkor is, amikor ez a webapp nincs megnyitva.</p>
+      </section>
+    </section>
+
+    <section id="salaryTab" class="tab-panel" hidden>
+      <section class="month-switcher panel-card compact-panel">
+        <button id="salaryPrevMonth" class="icon-btn" type="button">‹</button>
+        <div><p class="eyebrow">FIZETÉSKALKULÁTOR</p><h2 id="salaryMonthTitle"></h2></div>
+        <button id="salaryNextMonth" class="icon-btn" type="button">›</button>
+      </section>
+
+      <section class="salary-hero-grid">
+        <article class="money-card gross"><span>Várható bruttó</span><strong id="grossSalary">0 Ft</strong><small id="grossDelta"></small></article>
+        <article class="money-card net"><span>Várható nettó</span><strong id="netSalary">0 Ft</strong><small id="netNote">Becsült összeg</small></article>
+        <article class="money-card earned"><span>Eddig megkeresve</span><strong id="earnedSoFar">0 Ft</strong><small id="earnedProgress">—</small></article>
+      </section>
+
+      <section class="panel-card">
+        <div class="section-heading compact-heading"><div><p class="eyebrow">RÉSZLETEZÉS</p><h2>Havi számítás</h2></div><button id="openSalarySettings" class="text-btn" type="button">Beállítások</button></div>
+        <div id="salaryBreakdown" class="breakdown-list"></div>
+        <div class="calculation-note">Ez tervezési becslés. A tényleges bérlap eltérhet a munkahelyi elszámolás, pótlékalap, betegállomány, adókedvezmények és egyéb juttatások miatt.</div>
+      </section>
+
+      <section class="panel-card">
+        <div class="section-heading compact-heading"><div><p class="eyebrow">TÉNYLEGES FIZETÉS</p><h2>Összehasonlítás</h2></div></div>
+        <div class="settings-grid two-col">
+          <label class="field"><span>Megkapott nettó összeg</span><input id="actualNetInput" type="number" min="0" step="1000" placeholder="Pl. 520000" /></label>
+          <div class="actual-comparison"><span>Eltérés a becsléstől</span><strong id="actualDifference">—</strong></div>
+        </div>
+        <div class="button-row"><button id="saveActualNet" class="primary-btn" type="button">Tényleges összeg mentése</button><button id="clearActualNet" class="secondary-btn" type="button">Törlés</button></div>
+      </section>
+    </section>
+
+    <section id="statsTab" class="tab-panel" hidden>
+      <section class="panel-card compact-panel stats-year-toolbar">
+        <button id="statsPrevYear" class="icon-btn" type="button">‹</button>
+        <div><p class="eyebrow">ÉVES STATISZTIKA</p><h2 id="statsYearTitle"></h2></div>
+        <button id="statsNextYear" class="icon-btn" type="button">›</button>
+      </section>
+
+      <section class="summary-grid stats-summary">
+        <article class="summary-card"><span>Ledolgozott nap</span><strong id="yearWorkDays">0</strong></article>
+        <article class="summary-card"><span>Munkaóra</span><strong id="yearWorkHours">0</strong></article>
+        <article class="summary-card"><span>Túlóra</span><strong id="yearOvertime">0 óra</strong></article>
+        <article class="summary-card"><span>Szabadság</span><strong id="yearVacation">0 nap</strong></article>
+        <article class="summary-card"><span>Betegnap</span><strong id="yearSick">0 nap</strong></article>
+        <article class="summary-card"><span>Becsült nettó</span><strong id="yearNet">0 Ft</strong></article>
+      </section>
+
+      <section class="panel-card">
+        <div class="section-heading compact-heading"><div><p class="eyebrow">MŰSZAKOK</p><h2>Eloszlás</h2></div></div>
+        <div id="shiftDistribution" class="distribution-grid"></div>
+      </section>
+
+      <section class="panel-card">
+        <div class="section-heading compact-heading"><div><p class="eyebrow">HAVI MUNKAÓRÁK</p><h2>Éves diagram</h2></div></div>
+        <div id="hoursChart" class="bar-chart" aria-label="Havi munkaóra diagram"></div>
+      </section>
+
+      <section class="panel-card">
+        <div class="section-heading compact-heading"><div><p class="eyebrow">FIZETÉS</p><h2>Becsült és tényleges nettó</h2></div></div>
+        <div id="salaryChart" class="bar-chart dual-chart" aria-label="Havi fizetés diagram"></div>
+      </section>
+
+      <section class="panel-card leave-balance-card">
+        <div class="section-heading compact-heading"><div><p class="eyebrow">SZABADSÁGKERET</p><h2 id="leaveBalanceTitle">—</h2></div></div>
+        <div class="progress-track"><div id="leaveProgress" class="progress-fill"></div></div>
+        <p id="leaveBalanceDetail">—</p>
       </section>
     </section>
 
     <section id="settingsTab" class="tab-panel" hidden>
-      <section class="settings-card">
-        <div class="section-heading">
-          <div>
-            <p class="eyebrow">SZEMÉLYRE SZABÁS</p>
-            <h2>App és fejléc</h2>
+      <details class="settings-card" open>
+        <summary><span><small>SZEMÉLYRE SZABÁS</small>App, fejléc és színek</span><span>⌄</span></summary>
+        <div class="details-body">
+          <div class="section-heading">
+            <div><p class="eyebrow">MEGJELENÉS</p><h2>Saját név és ikon</h2></div>
+            <img id="iconPreview" class="icon-preview" alt="Egyedi appikon előnézete" />
           </div>
-          <img id="iconPreview" class="icon-preview" alt="Egyedi appikon előnézete" />
+          <form id="brandingForm">
+            <div class="settings-grid two-col">
+              <label class="field"><span>Főképernyős app neve</span><input id="appNameInput" type="text" maxlength="40" /></label>
+              <label class="field"><span>Ikonon lévő szöveg</span><input id="iconTextInput" type="text" maxlength="30" /></label>
+              <label class="field"><span>Weboldal felső kis felirata</span><input id="eyebrowInput" type="text" maxlength="60" /></label>
+              <label class="field"><span>Weboldal főcíme</span><input id="headerTitleInput" type="text" maxlength="80" /></label>
+              <label class="field color-field"><span>Ikon háttérszíne</span><input id="iconBgInput" type="color" /></label>
+              <label class="field color-field"><span>Ikon betűszíne</span><input id="iconTextColorInput" type="color" /></label>
+              <label class="field color-field"><span>Kiemelőszín</span><input id="accentColorInput" type="color" /></label>
+              <label class="field"><span>Téma</span><select id="themeInput"><option value="dark">Sötét</option><option value="light">Világos</option><option value="system">Rendszer szerint</option></select></label>
+            </div>
+            <div class="button-row"><button class="primary-btn" type="submit">Megjelenés mentése</button><button id="resetBranding" class="secondary-btn" type="button">Alapértékek</button></div>
+          </form>
+          <p class="settings-hint">Az iPhone-on már kirakott ikon frissítéséhez töröld a régi főképernyős ikont, majd Safariból add hozzá újra.</p>
         </div>
+      </details>
 
-        <form id="brandingForm">
-          <div class="settings-grid">
-            <label class="field">
-              <span>Főképernyős app neve</span>
-              <input id="appNameInput" type="text" maxlength="40" placeholder="RSRG Naptár" />
-            </label>
-            <label class="field">
-              <span>Ikonon lévő szöveg</span>
-              <input id="iconTextInput" type="text" maxlength="30" placeholder="RSRG" />
-            </label>
-            <label class="field">
-              <span>Weboldal felső kis felirata</span>
-              <input id="eyebrowInput" type="text" maxlength="60" placeholder="MUNKAHELYI NAPTÁR" />
-            </label>
-            <label class="field">
-              <span>Weboldal főcíme</span>
-              <input id="headerTitleInput" type="text" maxlength="80" placeholder="RSRG Műszaknaptár" />
-            </label>
-            <label class="field color-field">
-              <span>Ikon háttérszíne</span>
-              <input id="iconBgInput" type="color" value="#111827" />
-            </label>
-            <label class="field color-field">
-              <span>Ikon betűszíne</span>
-              <input id="iconTextColorInput" type="color" value="#ffffff" />
-            </label>
-          </div>
-          <div class="button-row">
-            <button type="submit" class="primary-btn">Megjelenés mentése</button>
-            <button type="button" id="resetBranding" class="secondary-btn">Alapértékek</button>
-          </div>
-        </form>
-        <p class="settings-hint">Az appikon bármilyen szöveget elfogad; hosszabb szövegnél automatikusan kisebb lesz. iPhone-on a már telepített ikon cseréjéhez töröld a főképernyős ikont, majd add hozzá újra Safariból.</p>
-      </section>
-
-      <section class="settings-card">
-        <div class="section-heading compact-heading">
-          <div>
-            <p class="eyebrow">SAJÁT OPCIÓK</p>
-            <h2>Műszak vagy nap hozzáadása</h2>
-          </div>
+      <details class="settings-card" id="salarySettingsCard">
+        <summary><span><small>FIZETÉS</small>Alapbér, pótlékok és adók</span><span>⌄</span></summary>
+        <div class="details-body">
+          <form id="salarySettingsForm">
+            <div class="settings-grid three-col">
+              <label class="field"><span>Havi bruttó alapbér</span><input id="baseSalaryInput" type="number" min="0" step="1000" /></label>
+              <label class="field"><span>Órabér osztó</span><input id="hourDivisorInput" type="number" min="1" step="1" /></label>
+              <label class="field"><span>Fix havi bruttó bónusz</span><input id="fixedBonusInput" type="number" step="1000" /></label>
+              <label class="field"><span>Délutáni pótlék 18–22</span><div class="suffix-input"><input id="afternoonPremiumInput" type="number" min="0" step="1" /><span>%</span></div></label>
+              <label class="field"><span>Éjszakai pótlék 22–06</span><div class="suffix-input"><input id="nightPremiumInput" type="number" min="0" step="1" /><span>%</span></div></label>
+              <label class="field"><span>Vasárnapi pótlék</span><div class="suffix-input"><input id="sundayPremiumInput" type="number" min="0" step="1" /><span>%</span></div></label>
+              <label class="field"><span>Ünnepnapi pótlék</span><div class="suffix-input"><input id="holidayPremiumInput" type="number" min="0" step="1" /><span>%</span></div></label>
+              <label class="field"><span>Normál túlóra pótléka</span><div class="suffix-input"><input id="overtimePremiumInput" type="number" min="0" step="1" /><span>%</span></div></label>
+              <label class="field"><span>Pihenőnapi túlóra pótléka</span><div class="suffix-input"><input id="restOvertimePremiumInput" type="number" min="0" step="1" /><span>%</span></div></label>
+              <label class="field"><span>Betegnap fizetett aránya</span><div class="suffix-input"><input id="sickPercentInput" type="number" min="0" max="100" step="1" /><span>%</span></div></label>
+              <label class="field"><span>SZJA</span><div class="suffix-input"><input id="taxRateInput" type="number" min="0" step="0.1" /><span>%</span></div></label>
+              <label class="field"><span>TB-járulék</span><div class="suffix-input"><input id="socialRateInput" type="number" min="0" step="0.1" /><span>%</span></div></label>
+              <label class="field"><span>25 év alatti havi keret</span><input id="under25LimitInput" type="number" min="0" step="1" /></label>
+              <label class="field"><span>Egyéb havi nettó kedvezmény</span><input id="otherNetAllowanceInput" type="number" step="1000" /></label>
+              <label class="field"><span>Egyéb havi levonás</span><input id="otherDeductionInput" type="number" step="1000" /></label>
+              <label class="field"><span>Fizetésnap</span><select id="paydayBusinessDayInput"><option value="1">1. munkanap</option><option value="2">2. munkanap</option><option value="3">3. munkanap</option><option value="4">4. munkanap</option><option value="5">5. munkanap</option></select></label>
+            </div>
+            <label class="check-row"><input id="under25EnabledInput" type="checkbox" /><span>25 év alatti SZJA-kedvezmény számítása</span></label>
+            <div class="button-row"><button class="primary-btn" type="submit">Fizetési beállítások mentése</button><button id="resetSalarySettings" class="secondary-btn" type="button">Alapértékek</button></div>
+          </form>
         </div>
+      </details>
 
-        <form id="customOptionForm">
-          <input id="customOptionId" type="hidden" />
-          <div class="settings-grid">
-            <label class="field">
-              <span>Megnevezés</span>
-              <input id="customName" type="text" maxlength="50" required placeholder="Pl. Hétvégi túlóra" />
-            </label>
-            <label class="field">
-              <span>Rövid felirat a naptárban</span>
-              <input id="customShort" type="text" maxlength="16" placeholder="Pl. 06–18" />
-            </label>
-            <label class="field">
-              <span>Opció típusa</span>
-              <select id="customType">
-                <option value="work">Műszak / ledolgozott nap</option>
-                <option value="paid_leave">Fizetett, munka nélküli nap</option>
-                <option value="unpaid_leave">Fizetetlen távollét</option>
-                <option value="off">Szabadnap / pihenőnap</option>
-              </select>
-            </label>
-            <label class="field color-field">
-              <span>Szín</span>
-              <input id="customColor" type="color" value="#8b5cf6" />
-            </label>
-            <label class="field time-dependent">
-              <span>Kezdés</span>
-              <input id="customStart" type="time" />
-            </label>
-            <label class="field time-dependent">
-              <span>Befejezés</span>
-              <input id="customEnd" type="time" />
-            </label>
-            <label class="field">
-              <span>Ledolgozott órák</span>
-              <input id="customHours" type="number" min="0" max="24" step="0.25" placeholder="Automatikus az időpontból" />
-            </label>
-            <label class="field">
-              <span>Fizetett órák</span>
-              <input id="customPaidHours" type="number" min="0" max="24" step="0.25" value="8" />
-            </label>
-            <label class="field">
-              <span>Ebből túlóra</span>
-              <input id="customOvertimeHours" type="number" min="0" max="24" step="0.25" value="0" />
-            </label>
-          </div>
-          <div class="button-row">
-            <button id="saveCustomOption" type="submit" class="primary-btn">Saját opció hozzáadása</button>
-            <button id="cancelCustomEdit" type="button" class="secondary-btn" hidden>Szerkesztés megszakítása</button>
-          </div>
-        </form>
-
-        <div class="built-in-note">
-          <strong>Beépített új lehetőség:</strong> a nap kiválasztásánál már elérhető a „Fizetett munka nélküli nap” és a „Fizetett ünnepnap” is.
+      <details class="settings-card">
+        <summary><span><small>SZABADSÁG ÉS ÉRTESÍTÉS</small>Keret, riasztások, fizetésnap</span><span>⌄</span></summary>
+        <div class="details-body">
+          <form id="reminderSettingsForm">
+            <div class="settings-grid three-col">
+              <label class="field"><span>Éves szabadságkeret</span><input id="annualLeaveInput" type="number" min="0" step="1" /></label>
+              <label class="field"><span>Áthozott szabadság</span><input id="carryLeaveInput" type="number" min="0" step="1" /></label>
+              <label class="field"><span>Műszak előtti emlékeztető</span><select id="shiftReminderMinutesInput"><option value="30">30 perccel</option><option value="60">1 órával</option><option value="120">2 órával</option><option value="180">3 órával</option><option value="720">12 órával</option><option value="1440">1 nappal</option></select></label>
+            </div>
+            <label class="check-row"><input id="shiftReminderEnabledInput" type="checkbox" /><span>Műszak előtti értesítés</span></label>
+            <label class="check-row"><input id="paydayReminderEnabledInput" type="checkbox" /><span>Fizetésnapi értesítés</span></label>
+            <div class="button-row"><button class="primary-btn" type="submit">Mentés</button><button id="requestNotificationsBtn" class="secondary-btn" type="button">Értesítések engedélyezése</button><button id="testNotificationBtn" class="secondary-btn" type="button">Tesztértesítés</button></div>
+            <p id="notificationStatus" class="settings-hint">Értesítési állapot: —</p>
+            <p class="settings-hint">A webes értesítés csak akkor ellenőrizhető biztosan, amikor az app fut vagy nemrég meg volt nyitva. A háttérben is megbízható jelzéshez használd az iPhone naptár exportját.</p>
+          </form>
         </div>
+      </details>
 
-        <div class="custom-list-head">
-          <h3>Saját opcióid</h3>
-          <span id="customOptionCount">0 db</span>
+      <details class="settings-card">
+        <summary><span><small>SAJÁT OPCIÓK</small>Új műszak vagy távollét</span><span>⌄</span></summary>
+        <div class="details-body">
+          <form id="customOptionForm">
+            <input id="customOptionId" type="hidden" />
+            <div class="settings-grid three-col">
+              <label class="field"><span>Megnevezés</span><input id="customName" type="text" maxlength="50" required /></label>
+              <label class="field"><span>Rövid naptárfelirat</span><input id="customShort" type="text" maxlength="16" /></label>
+              <label class="field"><span>Opció típusa</span><select id="customType"><option value="work">Műszak / ledolgozott nap</option><option value="paid_leave">Fizetett munka nélküli nap</option><option value="sick">Betegnap</option><option value="unpaid_leave">Fizetetlen távollét</option><option value="off">Szabadnap</option></select></label>
+              <label class="field color-field"><span>Szín</span><input id="customColor" type="color" value="#8b5cf6" /></label>
+              <label class="field time-dependent"><span>Kezdés</span><input id="customStart" type="time" /></label>
+              <label class="field time-dependent"><span>Befejezés</span><input id="customEnd" type="time" /></label>
+              <label class="field"><span>Ledolgozott órák</span><input id="customHours" type="number" min="0" max="24" step="0.25" /></label>
+              <label class="field"><span>Fizetett órák</span><input id="customPaidHours" type="number" min="0" max="24" step="0.25" value="8" /></label>
+              <label class="field"><span>Ebből túlóra</span><input id="customOvertimeHours" type="number" min="0" max="24" step="0.25" value="0" /></label>
+            </div>
+            <div class="button-row"><button id="saveCustomOption" class="primary-btn" type="submit">Saját opció hozzáadása</button><button id="cancelCustomEdit" class="secondary-btn" type="button" hidden>Szerkesztés megszakítása</button></div>
+          </form>
+          <div class="custom-list-head"><h3>Saját opcióid</h3><span id="customOptionCount">0 db</span></div>
+          <div id="customOptionList" class="custom-option-list"></div>
         </div>
-        <div id="customOptionList" class="custom-option-list"></div>
-      </section>
+      </details>
+
+      <details class="settings-card">
+        <summary><span><small>MUNKAREND</small>Egyedi munkanapok és pihenőnapok</span><span>⌄</span></summary>
+        <div class="details-body">
+          <form id="specialDayForm">
+            <div class="settings-grid three-col">
+              <label class="field"><span>Dátum</span><input id="specialDayDate" type="date" required /></label>
+              <label class="field"><span>Típus</span><select id="specialDayType"><option value="working">Áthelyezett munkanap</option><option value="nonworking">Áthelyezett pihenőnap</option></select></label>
+              <label class="field"><span>Megnevezés</span><input id="specialDayLabel" type="text" maxlength="40" placeholder="Pl. ledolgozós szombat" /></label>
+            </div>
+            <button class="primary-btn" type="submit">Nap hozzáadása</button>
+          </form>
+          <div id="specialDayList" class="custom-option-list"></div>
+        </div>
+      </details>
+
+      <details class="settings-card">
+        <summary><span><small>BIZTONSÁGI MENTÉS</small>Export, import és visszaállítás</span><span>⌄</span></summary>
+        <div class="details-body">
+          <div class="button-row wrap">
+            <button id="exportBackupBtn" class="primary-btn" type="button">Teljes mentés letöltése</button>
+            <label class="file-btn">Mentés visszatöltése<input id="importBackupInput" type="file" accept="application/json,.json" /></label>
+            <button id="resetAllBtn" class="danger-btn" type="button">Minden adat törlése</button>
+          </div>
+          <p class="settings-hint">A mentés tartalmazza a műszakokat, eseményeket, fizetési beállításokat, saját opciókat és a megjelenést.</p>
+        </div>
+      </details>
+
+      <details class="settings-card">
+        <summary><span><small>APP INFORMÁCIÓ</small>Telepítés és verzió</span><span>⌄</span></summary>
+        <div class="details-body">
+          <p><strong>RSRG Műszaknaptár V4</strong></p>
+          <p class="settings-hint">iPhone telepítés: Safari → Megosztás → Főképernyőhöz adás. Frissítés után zárd be és nyisd meg újra az appot.</p>
+          <button id="forceUpdateBtn" class="secondary-btn" type="button">Frissítés keresése</button>
+        </div>
+      </details>
     </section>
   </main>
 
   <dialog id="shiftDialog" class="shift-dialog">
-    <form method="dialog">
+    <form id="dayEditorForm" method="dialog">
       <div class="dialog-head">
-        <div>
-          <p class="eyebrow">NAP BEÁLLÍTÁSA</p>
-          <h3 id="selectedDateTitle"></h3>
-        </div>
+        <div><p class="eyebrow">NAP SZERKESZTÉSE</p><h3 id="selectedDateTitle"></h3><p id="selectedDateHoliday" class="holiday-line"></p></div>
         <button value="cancel" class="close-btn" aria-label="Bezárás">×</button>
       </div>
 
-      <p class="option-heading">Normál műszak</p>
-      <div class="shift-options">
-        <button type="button" data-shift="morning" class="shift-option morning-bg">
-          <strong>Délelőtt</strong><span>06:00–14:00 · 8 óra</span>
-        </button>
-        <button type="button" data-shift="afternoon" class="shift-option afternoon-bg">
-          <strong>Délután</strong><span>14:00–22:00 · 8 óra</span>
-        </button>
-        <button type="button" data-shift="night" class="shift-option night-bg">
-          <strong>Éjszaka</strong><span>22:00–06:00 · 8 óra</span>
-        </button>
+      <p class="option-heading">Műszak vagy távollét</p>
+      <div id="builtInShiftOptions" class="shift-options"></div>
+      <section id="customShiftSection" hidden><p class="option-heading">Saját opciók</p><div id="customShiftOptions" class="shift-options"></div></section>
+
+      <div class="settings-grid two-col dialog-grid">
+        <label class="field"><span>Túlóraórák felülírása</span><input id="dayOvertimeHours" type="number" min="0" max="24" step="0.25" placeholder="Automatikus" /></label>
+        <label class="field"><span>Túlóra típusa</span><select id="dayOvertimeType"><option value="normal">Normál munkanapi túlóra</option><option value="rest">Pihenőnapi / ünnepnapi túlóra</option></select></label>
       </div>
 
-      <p class="option-heading">12 órás túlóra</p>
-      <div class="shift-options overtime-options">
-        <button type="button" data-shift="morning_ot_02_14" class="shift-option overtime-morning-bg">
-          <strong>Délelőtt túlóra</strong><span>02:00–14:00 · 12 óra</span>
-        </button>
-        <button type="button" data-shift="morning_ot_06_18" class="shift-option overtime-morning-bg">
-          <strong>Délelőtt túlóra</strong><span>06:00–18:00 · 12 óra</span>
-        </button>
-        <button type="button" data-shift="afternoon_ot_10_22" class="shift-option overtime-afternoon-bg">
-          <strong>Délután túlóra</strong><span>10:00–22:00 · 12 óra</span>
-        </button>
-        <button type="button" data-shift="afternoon_ot_14_02" class="shift-option overtime-afternoon-bg">
-          <strong>Délután túlóra</strong><span>14:00–02:00 · 12 óra</span>
-        </button>
-        <button type="button" data-shift="night_ot_18_06" class="shift-option overtime-night-bg">
-          <strong>Éjszaka túlóra</strong><span>18:00–06:00 · 12 óra</span>
-        </button>
-        <button type="button" data-shift="night_ot_22_10" class="shift-option overtime-night-bg">
-          <strong>Éjszaka túlóra</strong><span>22:00–10:00 · 12 óra</span>
-        </button>
+      <p class="option-heading">Esemény és megjegyzés</p>
+      <div class="settings-grid two-col dialog-grid">
+        <label class="field"><span>Esemény neve</span><input id="dayEventTitle" type="text" maxlength="80" placeholder="Pl. SFT-vizsga" /></label>
+        <label class="field"><span>Esemény típusa</span><select id="dayEventType"><option value="work">Munkahelyi</option><option value="meeting">Megbeszélés</option><option value="exam">Vizsga / oktatás</option><option value="medical">Orvos</option><option value="personal">Személyes</option></select></label>
+        <label class="field"><span>Kezdés</span><input id="dayEventStart" type="time" /></label>
+        <label class="field"><span>Befejezés</span><input id="dayEventEnd" type="time" /></label>
+        <label class="field"><span>Helyszín</span><input id="dayEventLocation" type="text" maxlength="80" /></label>
+        <label class="field"><span>Emlékeztető</span><select id="dayEventReminder"><option value="0">Nincs</option><option value="15">15 perccel előtte</option><option value="30">30 perccel előtte</option><option value="60">1 órával előtte</option><option value="120">2 órával előtte</option><option value="1440">1 nappal előtte</option></select></label>
       </div>
-
-      <p class="option-heading">Távollét és egyéb</p>
-      <div class="shift-options">
-        <button type="button" data-shift="vacation" class="shift-option vacation-bg">
-          <strong>Szabadság</strong><span>Fizetett távollét</span>
-        </button>
-        <button type="button" data-shift="paid_leave" class="shift-option paid-leave-bg">
-          <strong>Fizetett munka nélküli nap</strong><span>8 fizetett óra · nincs munkavégzés</span>
-        </button>
-        <button type="button" data-shift="paid_holiday" class="shift-option paid-holiday-bg">
-          <strong>Fizetett ünnepnap</strong><span>8 fizetett óra · nincs munkavégzés</span>
-        </button>
-        <button type="button" data-shift="sick" class="shift-option sick-bg">
-          <strong>Táppénz</strong><span>Betegállomány</span>
-        </button>
-        <button type="button" data-shift="unpaid_leave" class="shift-option unpaid-bg">
-          <strong>Fizetetlen távollét</strong><span>Nincs fizetett óra</span>
-        </button>
-        <button type="button" data-shift="off" class="shift-option off-bg">
-          <strong>Szabadnap</strong><span>Nincs műszak</span>
-        </button>
-        <button type="button" data-shift="clear" class="shift-option clear-bg">
-          <strong>Törlés</strong><span>Nap alaphelyzetbe</span>
-        </button>
-      </div>
-
-      <section id="customShiftSection" hidden>
-        <p class="option-heading">Saját opciók</p>
-        <div id="customShiftOptions" class="shift-options"></div>
-      </section>
-
-      <label class="field note-field">
-        <span>Megjegyzés</span>
-        <textarea id="dayNote" rows="3" placeholder="Pl. SFT, EOL, kábelezés…"></textarea>
-      </label>
-      <button type="button" id="saveNote" class="primary-btn full-width">Megjegyzés mentése</button>
+      <label class="field note-field"><span>Megjegyzés</span><textarea id="dayNote" rows="3" placeholder="Pl. EOL, kábelezés, buszváltozás…"></textarea></label>
+      <div class="button-row dialog-actions"><button id="saveDayBtn" class="primary-btn" type="button">Nap mentése</button><button id="clearDayBtn" class="danger-btn" type="button">Nap törlése</button></div>
     </form>
   </dialog>
 
-  <script src="app.js"></script>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="app.js?v=4.0.0"></script>
 </body>
 </html>
