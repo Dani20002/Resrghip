@@ -1,6 +1,6 @@
-const CACHE = 'rsrg-calendar-v4-0-0';
+const CACHE = 'rsrg-calendar-v4-1-0';
 const ASSETS = [
-  './', './index.html', './style.css?v=4.0.0', './app.js?v=4.0.0',
+  './', './index.html', './style.css?v=4.1.0', './app.js?v=4.1.0',
   './manifest.webmanifest', './icon.svg', './icon-192.png', './icon-512.png'
 ];
 

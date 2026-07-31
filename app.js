@@ -1,6 +1,6 @@
 'use strict';
 
-const APP_VERSION = '4.0.0';
+const APP_VERSION = '4.1.0';
 const STORAGE_KEY = 'rsrg-shift-calendar-v1';
 const SETTINGS_KEY = 'rsrg-shift-calendar-settings-v4';
 const LEGACY_SETTINGS_KEY = 'rsrg-shift-calendar-settings-v3';
@@ -17,26 +17,6 @@ const DEFAULT_SETTINGS = {
   theme: 'dark',
   customOptions: [],
   specialDays: [],
-  actualNetByMonth: {},
-  salary: {
-    baseMonthly: 462000,
-    hourDivisor: 174,
-    fixedBonus: 0,
-    afternoonPremium: 30,
-    nightPremium: 40,
-    sundayPremium: 50,
-    holidayPremium: 100,
-    overtimePremium: 50,
-    restOvertimePremium: 100,
-    sickPercent: 70,
-    taxRate: 15,
-    socialRate: 18.5,
-    under25Enabled: true,
-    under25Limit: 715765,
-    otherNetAllowance: 0,
-    otherDeduction: 0,
-    paydayBusinessDay: 3
-  },
   leave: {
     annualAllowance: 20,
     carryOver: 0
@@ -44,7 +24,8 @@ const DEFAULT_SETTINGS = {
   reminders: {
     shiftEnabled: true,
     shiftMinutes: 120,
-    paydayEnabled: true
+    paydayEnabled: true,
+    paydayBusinessDay: 3
   }
 };
 
@@ -83,7 +64,6 @@ const BUILT_IN_ORDER = [
 ];
 
 const MONTHS_SHORT = ['Jan', 'Feb', 'Már', 'Ápr', 'Máj', 'Jún', 'Júl', 'Aug', 'Szept', 'Okt', 'Nov', 'Dec'];
-const HUF = new Intl.NumberFormat('hu-HU', { style: 'currency', currency: 'HUF', maximumFractionDigits: 0 });
 const NUMBER = new Intl.NumberFormat('hu-HU', { maximumFractionDigits: 2 });
 const DATE_LONG = new Intl.DateTimeFormat('hu-HU', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
 const DATE_MEDIUM = new Intl.DateTimeFormat('hu-HU', { month: 'long', day: 'numeric', weekday: 'short' });
@@ -118,20 +98,26 @@ function deepMerge(base, extra) {
   return output;
 }
 
-function loadSettings() {
-  const v4 = loadJson(SETTINGS_KEY, null);
-  const legacy = loadJson(LEGACY_SETTINGS_KEY, null);
-  const saved = v4 || legacy || {};
-  const merged = deepMerge(DEFAULT_SETTINGS, saved);
+
+function normalizeSettings(saved = {}) {
+  const merged = deepMerge(DEFAULT_SETTINGS, saved || {});
   merged.customOptions = Array.isArray(saved.customOptions) ? saved.customOptions : [];
   merged.specialDays = Array.isArray(saved.specialDays) ? saved.specialDays : [];
-  merged.actualNetByMonth = saved.actualNetByMonth && typeof saved.actualNetByMonth === 'object' ? saved.actualNetByMonth : {};
+  const legacyPayday = saved?.reminders?.paydayBusinessDay ?? saved?.salary?.paydayBusinessDay ?? 3;
+  merged.reminders.paydayBusinessDay = clamp(Number(legacyPayday) || 3, 1, 10);
+  delete merged.salary;
+  delete merged.actualNetByMonth;
   return merged;
+}
+
+function loadSettings() {
+  const current = loadJson(SETTINGS_KEY, null);
+  const legacy = loadJson(LEGACY_SETTINGS_KEY, null);
+  return normalizeSettings(current || legacy || {});
 }
 
 const state = {
   viewDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
-  salaryDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
   statsYear: new Date().getFullYear(),
   selectedDate: null,
   draftShiftId: '',
@@ -164,9 +150,6 @@ function parseKey(key) {
   return new Date(y, m - 1, d);
 }
 
-function monthKey(year, month) {
-  return `${year}-${String(month + 1).padStart(2, '0')}`;
-}
 
 function addDays(date, amount) {
   const next = new Date(date);
@@ -195,9 +178,6 @@ function formatHours(value) {
   return `${NUMBER.format(Number(value) || 0)} óra`;
 }
 
-function formatMoney(value) {
-  return HUF.format(Math.round(Number(value) || 0));
-}
 
 function durationBetween(start, end) {
   if (!start || !end) return 0;
@@ -288,7 +268,7 @@ function isBusinessDay(date) {
 }
 
 function getPayday(year, month) {
-  const target = clamp(Number(state.settings.salary.paydayBusinessDay) || 3, 1, 10);
+  const target = clamp(Number(state.settings.reminders.paydayBusinessDay) || 3, 1, 10);
   let count = 0;
   const date = new Date(year, month, 1);
   while (date.getMonth() === month) {
@@ -322,40 +302,8 @@ function getShiftDateTimes(key, meta) {
   return { start, end };
 }
 
-function splitShiftByMidnight(key, meta) {
-  const bounds = getShiftDateTimes(key, meta);
-  if (!bounds) return [];
-  const segments = [];
-  let cursor = new Date(bounds.start);
-  while (cursor < bounds.end) {
-    const midnight = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + 1, 0, 0, 0, 0);
-    const segmentEnd = midnight < bounds.end ? midnight : bounds.end;
-    segments.push({ start: new Date(cursor), end: new Date(segmentEnd) });
-    cursor = segmentEnd;
-  }
-  return segments;
-}
 
-function overlapHours(start, end, windowStartHour, windowEndHour) {
-  const day = new Date(start.getFullYear(), start.getMonth(), start.getDate());
-  const ws = new Date(day.getFullYear(), day.getMonth(), day.getDate(), windowStartHour, 0, 0, 0);
-  const we = new Date(day.getFullYear(), day.getMonth(), day.getDate(), windowEndHour, 0, 0, 0);
-  const from = Math.max(start.getTime(), ws.getTime());
-  const to = Math.min(end.getTime(), we.getTime());
-  return Math.max(0, to - from) / 3600000;
-}
 
-function premiumHoursForEntry(key, meta) {
-  const result = { afternoon: 0, night: 0, sunday: 0, holiday: 0 };
-  splitShiftByMidnight(key, meta).forEach(segment => {
-    result.afternoon += overlapHours(segment.start, segment.end, 18, 22);
-    result.night += overlapHours(segment.start, segment.end, 0, 6) + overlapHours(segment.start, segment.end, 22, 24);
-    const hours = (segment.end - segment.start) / 3600000;
-    if (segment.start.getDay() === 0) result.sunday += hours;
-    if (isHoliday(segment.start)) result.holiday += hours;
-  });
-  return result;
-}
 
 function getMonthKeys(year, month) {
   return Object.keys(state.entries).filter(key => {
@@ -414,109 +362,26 @@ function getMonthStats(year, month, cutoffKey = null) {
   return stats;
 }
 
-function calculateSalary(year, month, cutoffKey = null) {
-  const s = state.settings.salary;
-  const hourly = (Number(s.baseMonthly) || 0) / Math.max(1, Number(s.hourDivisor) || 174);
-  const totalStandardDays = Math.max(1, getStandardWorkdays(year, month));
-  let baseFactor = 1;
-  if (cutoffKey) {
-    let elapsed = 0;
-    const date = new Date(year, month, 1);
-    while (date.getMonth() === month && toKey(date) <= cutoffKey) {
-      if (isBusinessDay(date)) elapsed += 1;
-      date.setDate(date.getDate() + 1);
-    }
-    baseFactor = clamp(elapsed / totalStandardDays, 0, 1);
-  }
 
-  const result = {
-    base: (Number(s.baseMonthly) || 0) * baseFactor,
-    fixedBonus: (Number(s.fixedBonus) || 0) * baseFactor,
-    afternoonPremium: 0,
-    nightPremium: 0,
-    sundayPremium: 0,
-    holidayPremium: 0,
-    overtimePay: 0,
-    unpaidDeduction: 0,
-    sickReduction: 0,
-    szja: 0,
-    social: 0,
-    otherNetAllowance: (Number(s.otherNetAllowance) || 0) * baseFactor,
-    otherDeduction: (Number(s.otherDeduction) || 0) * baseFactor,
-    gross: 0,
-    net: 0,
-    hourly,
-    standardDays: totalStandardDays,
-    standardHours: totalStandardDays * 8,
-    baseFactor
-  };
 
-  getMonthKeys(year, month).forEach(key => {
-    if (cutoffKey && key > cutoffKey) return;
-    const entry = getEntry(key);
-    const meta = getMeta(entry.shift);
-    if (!meta) return;
-
-    if (meta.workDay) {
-      const premiumHours = premiumHoursForEntry(key, meta);
-      result.afternoonPremium += hourly * premiumHours.afternoon * (Number(s.afternoonPremium) || 0) / 100;
-      result.nightPremium += hourly * premiumHours.night * (Number(s.nightPremium) || 0) / 100;
-      result.sundayPremium += hourly * premiumHours.sunday * (Number(s.sundayPremium) || 0) / 100;
-      result.holidayPremium += hourly * premiumHours.holiday * (Number(s.holidayPremium) || 0) / 100;
-
-      const otHours = Number.isFinite(Number(entry.overtimeHours)) && entry.overtimeHours !== '' ? Number(entry.overtimeHours) : Number(meta.overtimeHours) || 0;
-      if (otHours > 0) {
-        const rate = entry.overtimeType === 'rest' ? Number(s.restOvertimePremium) || 0 : Number(s.overtimePremium) || 0;
-        result.overtimePay += hourly * otHours * (1 + rate / 100);
-      }
-    } else if (meta.type === 'unpaid_leave') {
-      result.unpaidDeduction += hourly * (Number(meta.absenceHours) || 8);
-    } else if (meta.type === 'sick') {
-      const missingRate = 1 - clamp((Number(s.sickPercent) || 0) / 100, 0, 1);
-      result.sickReduction += hourly * (Number(meta.absenceHours) || 8) * missingRate;
-    }
-  });
-
-  result.gross = Math.max(0,
-    result.base + result.fixedBonus + result.afternoonPremium + result.nightPremium + result.sundayPremium + result.holidayPremium + result.overtimePay - result.unpaidDeduction - result.sickReduction
-  );
-  const under25Allowance = s.under25Enabled ? Number(s.under25Limit) || 0 : 0;
-  const taxableForSzja = Math.max(0, result.gross - under25Allowance);
-  result.szja = taxableForSzja * (Number(s.taxRate) || 0) / 100;
-  result.social = result.gross * (Number(s.socialRate) || 0) / 100;
-  result.net = Math.max(0, result.gross - result.szja - result.social + result.otherNetAllowance - result.otherDeduction);
-  return result;
-}
-
-function calculateEarnedSoFar(year, month) {
-  const today = new Date();
-  const selected = new Date(year, month, 1);
-  const current = new Date(today.getFullYear(), today.getMonth(), 1);
-  if (selected > current) return calculateSalary(year, month, '0000-00-00');
-  if (selected < current) return calculateSalary(year, month);
-  return calculateSalary(year, month, toKey(today));
-}
 
 function getAnnualStats(year) {
   const annual = {
     workDays: 0, workHours: 0, overtimeHours: 0, vacationDays: 0, sickDays: 0, unpaidDays: 0,
-    estimatedNet: 0, shiftCounts: {}, months: []
+    shiftCounts: {}, months: []
   };
   for (let month = 0; month < 12; month += 1) {
     const stats = getMonthStats(year, month);
-    const salary = calculateSalary(year, month);
-    const actual = Number(state.settings.actualNetByMonth[monthKey(year, month)]);
     annual.workDays += stats.workDays;
     annual.workHours += stats.workHours;
     annual.overtimeHours += stats.overtimeHours;
     annual.vacationDays += stats.vacationDays;
     annual.sickDays += stats.sickDays;
     annual.unpaidDays += stats.unpaidDays;
-    annual.estimatedNet += salary.net;
     Object.entries(stats.shiftCounts).forEach(([id, count]) => {
       annual.shiftCounts[id] = (annual.shiftCounts[id] || 0) + count;
     });
-    annual.months.push({ stats, salary, actual: Number.isFinite(actual) ? actual : null });
+    annual.months.push({ stats });
   }
   return annual;
 }
@@ -535,7 +400,6 @@ function switchTab(tabId) {
   });
   if (tabId === 'homeTab') renderHome();
   if (tabId === 'calendarTab') renderCalendar();
-  if (tabId === 'salaryTab') renderSalary();
   if (tabId === 'statsTab') renderStats();
   if (tabId === 'settingsTab') renderSettingsLists();
   window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -545,11 +409,11 @@ function renderAll() {
   applyBranding();
   renderHome();
   renderCalendar();
-  renderSalary();
   renderStats();
   renderSettingsLists();
   updateNotificationStatus();
 }
+
 
 function renderHome() {
   const now = new Date();
@@ -558,10 +422,10 @@ function renderHome() {
   const todayKey = toKey(now);
   const tomorrowKey = toKey(addDays(now, 1));
   const stats = getMonthStats(year, month);
-  const salary = calculateSalary(year, month);
-  const earned = calculateEarnedSoFar(year, month);
   const payday = getPayday(year, month);
-  const nextPayday = now <= new Date(payday.getFullYear(), payday.getMonth(), payday.getDate(), 23, 59) ? payday : getPayday(month === 11 ? year + 1 : year, (month + 1) % 12);
+  const nextPayday = now <= new Date(payday.getFullYear(), payday.getMonth(), payday.getDate(), 23, 59)
+    ? payday
+    : getPayday(month === 11 ? year + 1 : year, (month + 1) % 12);
 
   $('todayShift').textContent = describeEntry(todayKey);
   $('tomorrowShift').textContent = describeEntry(tomorrowKey);
@@ -569,10 +433,10 @@ function renderHome() {
   const usedVacation = getAnnualStats(year).vacationDays;
   const leaveTotal = Number(state.settings.leave.annualAllowance) + Number(state.settings.leave.carryOver);
   $('homeVacationLeft').textContent = `${Math.max(0, leaveTotal - usedVacation)} nap`;
+  $('homeWorkDays').textContent = String(stats.workDays);
   $('homeWorkHours').textContent = formatHours(stats.workHours);
   $('homeOvertimeHours').textContent = formatHours(stats.overtimeHours);
-  $('homeNetSalary').textContent = formatMoney(salary.net);
-  $('homeEarnedSoFar').textContent = formatMoney(earned.net);
+  $('homePaidLeaveDays').textContent = `${stats.paidLeaveDays} nap`;
 
   state.nextShiftInfo = findNextShift(now);
   renderNextShiftCard();
@@ -916,82 +780,10 @@ function swapDays() {
   toast('A két napot felcseréltem.');
 }
 
-function renderSalary() {
-  const year = state.salaryDate.getFullYear();
-  const month = state.salaryDate.getMonth();
-  const calc = calculateSalary(year, month);
-  const earned = calculateEarnedSoFar(year, month);
-  const base = Number(state.settings.salary.baseMonthly) || 0;
-  $('salaryMonthTitle').textContent = MONTH_LONG.format(state.salaryDate);
-  $('grossSalary').textContent = formatMoney(calc.gross);
-  $('netSalary').textContent = formatMoney(calc.net);
-  $('earnedSoFar').textContent = formatMoney(earned.net);
-  $('grossDelta').textContent = `Alapbéren felül: ${formatMoney(calc.gross - base)}`;
-  $('netNote').textContent = state.settings.salary.under25Enabled ? '25 év alatti kedvezménnyel' : 'Normál SZJA-val';
-  $('earnedProgress').textContent = calc.baseFactor > 0 ? `${Math.round(earned.baseFactor * 100)}% havi alapbér-időarány` : '—';
 
-  const rows = [
-    ['Havi alapbér', calc.base, ''],
-    ['Fix havi bruttó bónusz', calc.fixedBonus, calc.fixedBonus >= 0 ? 'positive' : 'negative'],
-    [`Délutáni pótlék (${state.settings.salary.afternoonPremium}%)`, calc.afternoonPremium, 'positive'],
-    [`Éjszakai pótlék (${state.settings.salary.nightPremium}%)`, calc.nightPremium, 'positive'],
-    [`Vasárnapi pótlék (${state.settings.salary.sundayPremium}%)`, calc.sundayPremium, 'positive'],
-    [`Ünnepnapi pótlék (${state.settings.salary.holidayPremium}%)`, calc.holidayPremium, 'positive'],
-    ['Túlóra alap + pótlék', calc.overtimePay, 'positive'],
-    ['Fizetetlen távollét levonása', -calc.unpaidDeduction, 'negative'],
-    ['Betegnap becsült csökkentése', -calc.sickReduction, 'negative'],
-    ['Becsült bruttó', calc.gross, 'total'],
-    [`SZJA (${state.settings.salary.taxRate}%)`, -calc.szja, 'negative'],
-    [`TB-járulék (${state.settings.salary.socialRate}%)`, -calc.social, 'negative'],
-    ['Egyéb nettó kedvezmény', calc.otherNetAllowance, 'positive'],
-    ['Egyéb levonás', -calc.otherDeduction, 'negative'],
-    ['Becsült nettó', calc.net, 'total']
-  ];
-  const breakdown = $('salaryBreakdown');
-  breakdown.innerHTML = '';
-  rows.forEach(([label, value, cls]) => {
-    const row = document.createElement('div');
-    row.className = `breakdown-row ${cls === 'total' ? 'total' : ''}`;
-    const amountClass = cls === 'positive' ? 'positive' : cls === 'negative' ? 'negative' : '';
-    row.innerHTML = `<span>${label}</span><strong class="${amountClass}">${value < 0 ? '−' : ''}${formatMoney(Math.abs(value))}</strong>`;
-    breakdown.appendChild(row);
-  });
 
-  const savedActual = state.settings.actualNetByMonth[monthKey(year, month)];
-  $('actualNetInput').value = Number.isFinite(Number(savedActual)) ? savedActual : '';
-  updateActualDifference();
-}
 
-function updateActualDifference() {
-  const year = state.salaryDate.getFullYear();
-  const month = state.salaryDate.getMonth();
-  const actualRaw = $('actualNetInput').value.trim();
-  if (!actualRaw) {
-    $('actualDifference').textContent = '—';
-    return;
-  }
-  const diff = Number(actualRaw) - calculateSalary(year, month).net;
-  $('actualDifference').textContent = `${diff >= 0 ? '+' : '−'}${formatMoney(Math.abs(diff))}`;
-  $('actualDifference').style.color = diff >= 0 ? '#86efac' : '#fca5a5';
-}
 
-function saveActualNet() {
-  const value = Number($('actualNetInput').value);
-  if (!Number.isFinite(value) || value < 0) return toast('Adj meg érvényes nettó összeget.');
-  state.settings.actualNetByMonth[monthKey(state.salaryDate.getFullYear(), state.salaryDate.getMonth())] = value;
-  saveSettings();
-  renderSalary();
-  renderStats();
-  toast('Tényleges fizetés elmentve.');
-}
-
-function clearActualNet() {
-  delete state.settings.actualNetByMonth[monthKey(state.salaryDate.getFullYear(), state.salaryDate.getMonth())];
-  saveSettings();
-  renderSalary();
-  renderStats();
-  toast('Tényleges összeg törölve.');
-}
 
 function renderStats() {
   const year = state.statsYear;
@@ -1002,10 +794,9 @@ function renderStats() {
   $('yearOvertime').textContent = formatHours(annual.overtimeHours);
   $('yearVacation').textContent = `${annual.vacationDays} nap`;
   $('yearSick').textContent = `${annual.sickDays} nap`;
-  $('yearNet').textContent = formatMoney(annual.estimatedNet);
+  $('yearUnpaid').textContent = `${annual.unpaidDays} nap`;
   renderShiftDistribution(annual);
   renderHoursChart(annual);
-  renderSalaryChart(annual);
   renderLeaveBalance(annual);
 }
 
@@ -1042,21 +833,6 @@ function renderHoursChart(annual) {
   });
 }
 
-function renderSalaryChart(annual) {
-  const values = annual.months.flatMap(item => [item.salary.net, item.actual || 0]);
-  const max = Math.max(1, ...values);
-  const chart = $('salaryChart');
-  chart.innerHTML = '';
-  annual.months.forEach((item, index) => {
-    const estimateHeight = item.salary.net / max * 100;
-    const actualHeight = item.actual ? item.actual / max * 100 : 0;
-    const column = document.createElement('div');
-    column.className = 'bar-column';
-    column.title = `Becsült: ${formatMoney(item.salary.net)}${item.actual ? ` · Tényleges: ${formatMoney(item.actual)}` : ''}`;
-    column.innerHTML = `<span class="bar-value">${Math.round(item.salary.net / 1000)}e</span><div class="dual-bar-wrap"><div class="dual-bar" style="height:${estimateHeight}%"></div><div class="dual-bar actual" style="height:${actualHeight}%"></div></div><span class="bar-label">${MONTHS_SHORT[index]}</span>`;
-    chart.appendChild(column);
-  });
-}
 
 function renderLeaveBalance(annual) {
   const allowance = Number(state.settings.leave.annualAllowance) || 0;
@@ -1127,7 +903,7 @@ function createDynamicManifest(iconDataUrl) {
   const manifest = {
     name: state.settings.headerTitle,
     short_name: state.settings.appName,
-    description: 'RSRG műszaknaptár, fizetéskalkulátor és munkaidő-követő.',
+    description: 'RSRG műszaknaptár és munkaidő-követő.',
     start_url: './',
     scope: './',
     display: 'standalone',
@@ -1173,52 +949,9 @@ function saveBranding(event) {
   toast('Megjelenés elmentve.');
 }
 
-function syncSalarySettingsForm() {
-  const s = state.settings.salary;
-  $('baseSalaryInput').value = s.baseMonthly;
-  $('hourDivisorInput').value = s.hourDivisor;
-  $('fixedBonusInput').value = s.fixedBonus;
-  $('afternoonPremiumInput').value = s.afternoonPremium;
-  $('nightPremiumInput').value = s.nightPremium;
-  $('sundayPremiumInput').value = s.sundayPremium;
-  $('holidayPremiumInput').value = s.holidayPremium;
-  $('overtimePremiumInput').value = s.overtimePremium;
-  $('restOvertimePremiumInput').value = s.restOvertimePremium;
-  $('sickPercentInput').value = s.sickPercent;
-  $('taxRateInput').value = s.taxRate;
-  $('socialRateInput').value = s.socialRate;
-  $('under25LimitInput').value = s.under25Limit;
-  $('otherNetAllowanceInput').value = s.otherNetAllowance;
-  $('otherDeductionInput').value = s.otherDeduction;
-  $('paydayBusinessDayInput').value = String(s.paydayBusinessDay);
-  $('under25EnabledInput').checked = Boolean(s.under25Enabled);
-}
 
-function saveSalarySettings(event) {
-  event.preventDefault();
-  state.settings.salary = {
-    baseMonthly: numberValue('baseSalaryInput', 0),
-    hourDivisor: numberValue('hourDivisorInput', 174),
-    fixedBonus: numberValue('fixedBonusInput', 0),
-    afternoonPremium: numberValue('afternoonPremiumInput', 0),
-    nightPremium: numberValue('nightPremiumInput', 0),
-    sundayPremium: numberValue('sundayPremiumInput', 0),
-    holidayPremium: numberValue('holidayPremiumInput', 0),
-    overtimePremium: numberValue('overtimePremiumInput', 0),
-    restOvertimePremium: numberValue('restOvertimePremiumInput', 0),
-    sickPercent: numberValue('sickPercentInput', 0),
-    taxRate: numberValue('taxRateInput', 0),
-    socialRate: numberValue('socialRateInput', 0),
-    under25Enabled: $('under25EnabledInput').checked,
-    under25Limit: numberValue('under25LimitInput', 0),
-    otherNetAllowance: numberValue('otherNetAllowanceInput', 0),
-    otherDeduction: numberValue('otherDeductionInput', 0),
-    paydayBusinessDay: numberValue('paydayBusinessDayInput', 3)
-  };
-  saveSettings();
-  renderAll();
-  toast('Fizetési beállítások elmentve.');
-}
+
+
 
 function syncReminderSettingsForm() {
   $('annualLeaveInput').value = state.settings.leave.annualAllowance;
@@ -1226,6 +959,7 @@ function syncReminderSettingsForm() {
   $('shiftReminderMinutesInput').value = String(state.settings.reminders.shiftMinutes);
   $('shiftReminderEnabledInput').checked = Boolean(state.settings.reminders.shiftEnabled);
   $('paydayReminderEnabledInput').checked = Boolean(state.settings.reminders.paydayEnabled);
+  $('paydayBusinessDayInput').value = String(state.settings.reminders.paydayBusinessDay || 3);
 }
 
 function saveReminderSettings(event) {
@@ -1235,6 +969,7 @@ function saveReminderSettings(event) {
   state.settings.reminders.shiftMinutes = numberValue('shiftReminderMinutesInput', 120);
   state.settings.reminders.shiftEnabled = $('shiftReminderEnabledInput').checked;
   state.settings.reminders.paydayEnabled = $('paydayReminderEnabledInput').checked;
+  state.settings.reminders.paydayBusinessDay = clamp(numberValue('paydayBusinessDayInput', 3), 1, 10);
   saveSettings();
   renderAll();
   toast('Szabadság- és értesítési beállítások mentve.');
@@ -1427,7 +1162,7 @@ function icsDate(date) {
 }
 
 function buildIcs(year, month = null) {
-  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//RSRG Muszaknaptar V4//HU', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH'];
+  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//RSRG Muszaknaptar V4.1//HU', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH'];
   const keys = Object.keys(state.entries).sort().filter(key => {
     const date = parseKey(key);
     return date.getFullYear() === year && (month === null || date.getMonth() === month);
@@ -1514,7 +1249,7 @@ async function importBackup(file) {
     if (!data || typeof data !== 'object' || !data.entries || !data.settings) throw new Error('Hibás mentés');
     if (!confirm('A visszatöltés felülírja a jelenlegi adatokat. Folytatod?')) return;
     state.entries = data.entries;
-    state.settings = deepMerge(DEFAULT_SETTINGS, data.settings);
+    state.settings = normalizeSettings(data.settings);
     saveEntries();
     saveSettings();
     syncAllSettingsForms();
@@ -1619,7 +1354,6 @@ async function checkReminders() {
 
 function syncAllSettingsForms() {
   syncBrandingForm();
-  syncSalarySettingsForm();
   syncReminderSettingsForm();
 }
 
@@ -1633,7 +1367,6 @@ function bindEvents() {
   $('openCalendarFromHome').addEventListener('click', () => switchTab('calendarTab'));
   $('quickTodayEdit').addEventListener('click', () => openDayEditor(toKey(new Date())));
   $('quickRotation').addEventListener('click', () => switchTab('calendarTab'));
-  $('quickSalary').addEventListener('click', () => switchTab('salaryTab'));
   $('quickExportIcs').addEventListener('click', exportMonthIcs);
   $('openNextShiftDay').addEventListener('click', event => openDayEditor(event.currentTarget.dataset.date));
   $('upcomingList').addEventListener('click', event => {
@@ -1658,12 +1391,6 @@ function bindEvents() {
   $('exportYearIcs').addEventListener('click', exportYearIcs);
   $('exportMonthCsv').addEventListener('click', exportMonthCsv);
 
-  $('salaryPrevMonth').addEventListener('click', () => { state.salaryDate = new Date(state.salaryDate.getFullYear(), state.salaryDate.getMonth() - 1, 1); renderSalary(); });
-  $('salaryNextMonth').addEventListener('click', () => { state.salaryDate = new Date(state.salaryDate.getFullYear(), state.salaryDate.getMonth() + 1, 1); renderSalary(); });
-  $('actualNetInput').addEventListener('input', updateActualDifference);
-  $('saveActualNet').addEventListener('click', saveActualNet);
-  $('clearActualNet').addEventListener('click', clearActualNet);
-  $('openSalarySettings').addEventListener('click', () => { switchTab('settingsTab'); $('salarySettingsCard').open = true; $('salarySettingsCard').scrollIntoView({ behavior: 'smooth' }); });
 
   $('statsPrevYear').addEventListener('click', () => { state.statsYear -= 1; renderStats(); });
   $('statsNextYear').addEventListener('click', () => { state.statsYear += 1; renderStats(); });
@@ -1678,8 +1405,6 @@ function bindEvents() {
     });
     saveSettings(); syncBrandingForm(); renderAll(); toast('Megjelenés visszaállítva.');
   });
-  $('salarySettingsForm').addEventListener('submit', saveSalarySettings);
-  $('resetSalarySettings').addEventListener('click', () => { state.settings.salary = clone(DEFAULT_SETTINGS.salary); saveSettings(); syncSalarySettingsForm(); renderAll(); toast('Fizetési alapértékek visszaállítva.'); });
   $('reminderSettingsForm').addEventListener('submit', saveReminderSettings);
   $('requestNotificationsBtn').addEventListener('click', requestNotifications);
   $('testNotificationBtn').addEventListener('click', () => showNotification('RSRG tesztértesítés', { body: 'Az értesítések működnek.' }));
@@ -1728,7 +1453,7 @@ async function forceUpdate() {
 async function registerServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
   try {
-    const registration = await navigator.serviceWorker.register('./sw.js?v=4.0.0');
+    const registration = await navigator.serviceWorker.register('./sw.js?v=4.1.0');
     state.swRegistration = registration;
     registration.update();
     if (registration.waiting) $('updateBanner').hidden = false;
